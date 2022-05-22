@@ -1,0 +1,5 @@
+node_modules
+service
+public/sw.js.map
+public/worker-*
+.next
