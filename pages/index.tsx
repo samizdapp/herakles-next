@@ -7,31 +7,10 @@ import { isSupportedPlatform } from "../lib/support";
 import platform from "platform";
 
 export default function Home() {
-  const [hostname, setHostname] = useState("");
-
-  useEffect(() => {
-    if (hostname) {
-      const updateHostname = async (hostname: string) => {
-        await fetch("/api/hostname", {
-          method: "POST",
-          body: JSON.stringify({ hostname }),
-        });
-      };
-      updateHostname(hostname).catch(console.error);
-    }
-  }, [hostname]);
-
   return (
     <HomeLayout>
       <Card>
-        <h1>Welcome</h1>
-        <p>{JSON.stringify(platform)}</p>
-        <TextField
-          id="filled-basic"
-          label="Filled"
-          variant="filled"
-          onChange={(e) => setHostname(e.target.value)}
-        />
+        <h1>Welcome update</h1>
       </Card>
     </HomeLayout>
   );
