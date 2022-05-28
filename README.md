@@ -1,3 +1,7 @@
+_This is a very basic next.js progressive webapp, with some initial pages to change a device hostname and ensure connectivity_
+
+**WARNING: this code is currently mid-refactor to use [herakles-lib](https://github.com/samizdapp/herakles-lib) and should be considered broken until this notice is removed**
+
 # Progressive Web App Example
 
 This example uses [`next-pwa`](https://github.com/shadowwalker/next-pwa) to create a progressive web app (PWA) powered by [Workbox](https://developers.google.com/web/tools/workbox/).

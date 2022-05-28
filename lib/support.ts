@@ -1,6 +1,7 @@
 import platform from "platform";
 
-export function isSupportedPlatform(p = platform) {
+export function isSupportedPlatform(p = platform, query: any) {
+  if (query.expo) return true
   return p.name?.startsWith(getSupportedPlatform());
 }
 
