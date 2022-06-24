@@ -1,3 +1,3 @@
 #!/bin/sh
 
-node /usr/src/app/node_modules/.bin/next dev -p 80
+node /usr/src/app/node_modules/.bin/next dev -p 8001
