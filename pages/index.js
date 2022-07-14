@@ -1,7 +1,4 @@
 import HomeLayout from "../layouts/home";
-import { GetServerSideProps } from "next";
-import { isSupportedPlatform } from "../lib/support";
-import platform from "platform";
 import { useEffect } from "react";
 
 export default function Home() {

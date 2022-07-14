@@ -1,9 +1,7 @@
-import Client from 'herakles-lib/dist/pocket_client'
+import Client from "herakles-lib/dist/pocket_client";
 // import Client from 'https'
 
-self.setImmediate = (fn) => setTimeout(fn, 0)
-export { }
-declare const self: ServiceWorkerGlobalScope
+self.setImmediate = (fn) => setTimeout(fn, 0);
 
 // To disable all workbox logging during development, you can set self.__WB_DISABLE_DEV_LOGS to true
 // https://developers.google.com/web/tools/workbox/guides/configure-workbox#disable_logging
@@ -12,39 +10,34 @@ declare const self: ServiceWorkerGlobalScope
 
 // const _fetch = self.fetch
 
-interface AddressesResponse {
-    addresses: Array<string>,
-    index: number
-}
-
 // Listen to fetch events
-self.addEventListener('fetch', function (event) {
-    console.log('event', event)
-    if (event?.request.method !== 'GET') {
-        // default service worker only handles GET
-        event?.respondWith(fetch(event.request))
-    }
-    //   if (/\.jpg$|.png$/.test(event.request.url)) {                             1
+self.addEventListener("fetch", function (event) {
+  console.log("event", event);
+  if (event?.request.method !== "GET") {
+    // default service worker only handles GET
+    event?.respondWith(fetch(event.request));
+  }
+  //   if (/\.jpg$|.png$/.test(event.request.url)) {                             1
 
-    //     var supportsWebp = false;
-    //     if (event.request.headers.has('accept')) {                              2
-    //       supportsWebp = event.request.headers
-    //         .get('accept')
-    //         .includes('webp');
-    //     }
+  //     var supportsWebp = false;
+  //     if (event.request.headers.has('accept')) {                              2
+  //       supportsWebp = event.request.headers
+  //         .get('accept')
+  //         .includes('webp');
+  //     }
 
-    //     if (supportsWebp) {                                                     3
-    //        var req = event.request.clone();
+  //     if (supportsWebp) {                                                     3
+  //        var req = event.request.clone();
 
-    //       var returnUrl = req.url.substr(0, req.url.lastIndexOf(".")) + ".webp";4
+  //       var returnUrl = req.url.substr(0, req.url.lastIndexOf(".")) + ".webp";4
 
-    //       event.respondWith(
-    //         fetch(returnUrl, {
-    //           mode: 'no-cors'
-    //         })
-    //       );
-    //     }
-    //   }
+  //       event.respondWith(
+  //         fetch(returnUrl, {
+  //           mode: 'no-cors'
+  //         })
+  //       );
+  //     }
+  //   }
 });
 
 // const broadcast = new BroadcastChannel('address-channel');
@@ -157,17 +150,20 @@ self.addEventListener('fetch', function (event) {
 // // self.fetch = maybeRedirectFetch
 
 async function main() {
-    console.log('starting worker init')
-    const client = new Client({ host: 'setup.local', port: 4000 }, ({ lan, wan }) => {
-        console.log('worker got', lan, wan)
-    })
+  console.log("starting worker init");
+  const client = new Client(
+    { host: "setup.local", port: 4000 },
+    ({ lan, wan }) => {
+      console.log("worker got", lan, wan);
+    }
+  );
 
-    await client.init()
-    client.subdomain = 'pleroma'
-    client.patchFetchWorker()
-    console.log('patched fetch')
+  await client.init();
+  client.subdomain = "pleroma";
+  client.patchFetchWorker();
+  console.log("patched fetch");
 }
 
-main().catch(e => {
-    console.log('custom error', e)
-})
+main().catch((e) => {
+  console.log("custom error", e);
+});

@@ -1,10 +1,15 @@
 // @ts-ignore
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
 export default function HarnessedPage() {
   const {
     query: { dir },
   } = useRouter();
+
+  // const [host, setHost] = useState("localhost");
+  // useEffect(() => setHost(window.location.hostname), []);
+  // console.log("dirhost", dir, host);
 
   return (
     <iframe
@@ -23,8 +28,6 @@ export default function HarnessedPage() {
         overflow: "hidden",
         zIndex: 999999,
       }}
-    >
-      Your browser doesn't support iframes
-    </iframe>
+    />
   );
 }

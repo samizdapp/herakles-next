@@ -3,7 +3,9 @@ import HomeLayout from "../layouts/home";
 const fetcher = (...args: [any]) => fetch(...args).then((res) => res.json());
 
 export default function Home() {
-  const { data: time, error: timeError } = useSwr("/api/time", fetcher);
+  const { data: time, error: timeError } = useSwr("/api/time", fetcher, {
+    refreshInterval: 10000,
+  });
   // const { data: addresses, error: addressError } = useSwr(
   //   "/api/addresses",
   //   fetcher,
