@@ -6,7 +6,7 @@ export function isSupportedPlatform(p = platform, query: any) {
 }
 
 export function getSupportedPlatform(p = platform) {
-
+  debugger;
   switch (p.os?.family) {
     case "iOS":
       return "Safari";
