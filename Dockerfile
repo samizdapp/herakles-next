@@ -5,12 +5,7 @@ ENV PORT 3000
 
 WORKDIR /usr/src/app
 
-COPY package*.json /usr/src/app/
+COPY out out
+COPY copy.sh copy.sh
 
-RUN npm install 
-
-COPY . /usr/src/app/
-
-RUN npm run build
-
-CMD [ "npm","run","start" ]
+CMD [ "/bin/sh", "copy.sh"  ]

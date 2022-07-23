@@ -3,3 +3,5 @@ service
 public/sw.js.map
 public/worker-*
 .next
+tmp
+out
