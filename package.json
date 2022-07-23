@@ -3,7 +3,9 @@
   "scripts": {
     "dev": "next dev -p 8001",
     "build": "next build",
-    "start": "next start -p 8001"
+    "start": "next start -p 8001",
+    "export": "rm public/worker-* && next build && node next.config.js && next export",
+    "update-lib": "rm -rf node_modules && rm package-lock.json; npm install"
   },
   "dependencies": {
     "@amplitude/ua-parser-js": "^0.7.31",
@@ -14,7 +16,7 @@
     "@mui/icons-material": "^5.0.0-rc.1",
     "@mui/material": "^5.7.0",
     "@types/ua-parser-js": "^0.7.36",
-    "herakles-lib": "github:samizdapp/herakles-lib",
+    "herakles-lib": "github:samizdapp/herakles-lib#da80526",
     "libsodium-wrappers": "^0.7.10",
     "localforage": "^1.10.0",
     "next": "^12.1.6",

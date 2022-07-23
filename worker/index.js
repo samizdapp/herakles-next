@@ -1,5 +1,6 @@
 import Client from "herakles-lib/dist/pocket_client";
 // import Client from 'https'
+import localforage from "localforage";
 
 self.setImmediate = (fn) => setTimeout(fn, 0);
 
@@ -152,15 +153,25 @@ self.addEventListener("fetch", function (event) {
 async function main() {
   console.log("starting worker init");
   const client = new Client(
-    { host: "setup.local", port: 4000 },
+    { host: "setup.localhost", port: 4000 },
     ({ lan, wan }) => {
       console.log("worker got", lan, wan);
+      localforage.setItem("addresses", { lan, wan });
     }
   );
+
+  const obj = await localforage.getItem("addresses");
+  if (obj) {
+    obj.lan = obj.lan.trim();
+    obj.wan = obj.wan.trim();
+    console.log("got stored addresses", obj);
+    client.handleAddresses(obj);
+  }
 
   await client.init();
   client.subdomain = "pleroma";
   client.patchFetchWorker();
+  self.client = client;
   console.log("patched fetch");
 }
 
