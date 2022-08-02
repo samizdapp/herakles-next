@@ -7,8 +7,8 @@ const config = {
   pwa: {
     dest: "public",
     runtimeCaching,
-    cacheStartUrl: false,
-    dynamicStartUrl: false,
+    // cacheStartUrl: false,
+    // dynamicStartUrl: false,
   },
   extends: ["plugin:@next/next/recommended"],
 };
