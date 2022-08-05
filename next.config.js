@@ -6,20 +6,22 @@ const webpack = require("webpack");
 const config = {
   pwa: {
     dest: "public",
-    runtimeCaching,
+    // runtimeCaching,
     // cacheStartUrl: false,
     // dynamicStartUrl: false,
   },
-  extends: ["plugin:@next/next/recommended"],
+  // extends: ["plugin:@next/next/recommended"],
 };
 module.exports = withPWA(config);
 
 if (require.main === module) {
   config.plugins = [];
+  const buildId = require("fs").readFileSync(".next/BUILD_ID").toString().trim()
   module.exports.webpack(config, {
     webpack,
-    buildId: require("fs").readFileSync(".next/BUILD_ID"),
+    buildId,
     dev: false,
+    distDir: "public",
     dir: __dirname,
     config,
   });

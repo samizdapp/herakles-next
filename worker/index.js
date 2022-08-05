@@ -153,7 +153,7 @@ self.addEventListener("fetch", function (event) {
 async function main() {
   console.log("starting worker init");
   const client = new Client(
-    { host: "setup.localhost", port: 4000 },
+    { host: self.location.hostname, port: 4000 },
     ({ lan, wan }) => {
       console.log("worker got", lan, wan);
       localforage.setItem("addresses", { lan, wan });
