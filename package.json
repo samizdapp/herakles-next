@@ -15,7 +15,7 @@
     "@mui/icons-material": "^5.0.0-rc.1",
     "@mui/material": "^5.7.0",
     "@types/ua-parser-js": "^0.7.36",
-    "herakles-lib": "github:samizdapp/herakles-lib#02b573d",
+    "herakles-lib": "github:samizdapp/herakles-lib#e2cd1de",
     "libsodium-wrappers": "^0.7.10",
     "localforage": "^1.10.0",
     "next": "^12.1.6",
