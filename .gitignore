@@ -1,6 +1,7 @@
 node_modules
 service
 public/sw.js.map
+public/sw.js
 public/worker-*
 .next
 tmp
