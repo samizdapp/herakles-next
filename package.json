@@ -4,7 +4,7 @@
     "dev": "next dev -p 8001",
     "build": "next build",
     "start": "next start -p 8001",
-    "export": "next build && node next.config.js && next export"
+    "export": "rm public/*.LICENSE.txt; next build && node next.config.js && next export"
   },
   "dependencies": {
     "@amplitude/ua-parser-js": "^0.7.31",

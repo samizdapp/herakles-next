@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Typography from "@mui/material/Typography";
 import Grid from "@mui/material/Grid";
 
-export default function HostnameUpdater({}) {
+export default function Trust({}) {
   const [trusted, setTrusted] = useState(-1);
 
   useEffect(() => {

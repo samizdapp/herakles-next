@@ -1,12 +1,21 @@
 import platform from "platform";
 
-export function isSupportedPlatform(p = platform, query: any) {
-  if (query.expo) return true
-  return p.name?.startsWith(getSupportedPlatform());
+export function isPwa() {
+  return ["fullscreen", "standalone", "minimal-ui"].some(
+      (displayMode) => window.matchMedia('(display-mode: ' + displayMode + ')').matches
+  );
+}
+
+export function isSupportedPlatform(p = platform) {
+  // if (query.expo) return true
+  if (p.name?.startsWith(getSupportedPlatform())){
+    return getSupportedPlatform()
+  }
+
+  return false;
 }
 
 export function getSupportedPlatform(p = platform) {
-  debugger;
   switch (p.os?.family) {
     case "iOS":
       return "Safari";

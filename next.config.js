@@ -1,16 +1,19 @@
 // /** @type {import('next').NextConfig} */
 const withPWA = require("next-pwa");
-const runtimeCaching = require("next-pwa/cache");
+const runtimeCaching = require("./lib/cache.js");
 const webpack = require("webpack");
 
 const config = {
   pwa: {
     dest: "public",
+    scope: '/',
     // runtimeCaching,
     // cacheStartUrl: false,
-    // dynamicStartUrl: false,
+    dynamicStartUrl: true,
   },
-  // extends: ["plugin:@next/next/recommended"],
+  basePath: '/pwa',
+  trailingSlash: true,
+  extends: ["plugin:@next/next/recommended"],
 };
 module.exports = withPWA(config);
 

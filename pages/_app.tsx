@@ -28,20 +28,20 @@ export default function MyApp({
         <meta name="keywords" content="Keywords" />
         <title>Next.js PWA Example</title>
 
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/pwa/manifest.json" />
         <link
-          href="/icons/favicon-16x16.png"
+          href="/pwa/icons/favicon-48x48.png"
           rel="icon"
           type="image/png"
           sizes="16x16"
         />
         <link
-          href="/icons/favicon-32x32.png"
+          href="/pwa/icons/favicon-72x72.png"
           rel="icon"
           type="image/png"
           sizes="32x32"
         />
-        <link rel="apple-touch-icon" href="/apple-icon.png"></link>
+        <link rel="apple-touch-icon" href="/pwa/apple-icon.png"></link>
         <meta name="theme-color" content="#317EFB" />
       </Head>
       <ThemeProvider theme={theme}>
