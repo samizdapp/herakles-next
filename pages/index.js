@@ -4,8 +4,36 @@ import {getSupportedPlatform, isSupportedPlatform, isPwa} from '../lib/support'
 import BasicLayout from '../layouts/basic'
 import Trust from '../components/trust'
 
+const WELCOME_STATUS = `https://pleroma.507fd8ace43f877eb8e4f613d0b34e25ab213c356bb1bdd3422970ae2694e47.2.yg/api/v1/statuses/AMZ2VxYnjpo5sK8W00`
+const WELCOME_STATUS_PAGE = `/@ryan@pleroma.507fd8ace43f877eb8e4f613d0b34e25ab213c356bb1bdd3422970ae2694e47.2.yg/posts/AMZ2VxYnjpo5sK8W00`
+
+
 // let timeout = null;
 let _reloading = false;
+
+async function waitForWelcomeAvailable(){
+  while (true) {
+    const res = await fetch(WELCOME_STATUS).catch(e => {
+      console.warn(e)
+      return null;
+    })
+    if (res && res.ok){
+      return;
+    }
+    await new Promise(r => setTimeout(r, 2000))
+  } 
+}
+
+async function getLoadUrl(){
+  const welcome = await localStorage.getItem('welcome')
+
+  if (!welcome) {
+    await waitForWelcomeAvailable()
+    await localStorage.setItem('welcome', 'true')
+  }
+
+  return '/'
+}
 
 async function reload(){
   // alert('reload fn')
@@ -16,7 +44,7 @@ async function reload(){
     // alert('reload')
     if (!_reloading){
       _reloading = true;
-      window.location.href = `/timeline/fediverse`
+      window.location.href = await getLoadUrl()
     }
   }
 }
@@ -29,17 +57,11 @@ async function registerReloader(){
   return reload()
 }
 
-// async function alertLoop(){
-//   setInterval(() => {
-//     alert('interval loop?')
-//   }, 5000)
-// }
 
 registerReloader().catch(e => {
   alert(e.message)
 })
 
-// alertLoop()
 
 export default function Home() {
   const [platform, setPlatform] = useState('')

@@ -173,6 +173,27 @@ async function main() {
   client.patchFetchWorker();
   self.client = client;
   console.log("patched fetch");
+  const soapstore = localforage.createInstance({
+    name: "soapbox"
+  });
+  self.soapstore = soapstore
+
+  while (!(await localforage.getItem('welcome'))){
+    const key = (await soapstore.keys()).filter((k) => {
+      return k.startsWith('authAccount')
+    })[0]
+    const client = (await self.clients.matchAll()).filter(({url}) => {
+      const u = new URL(url)
+      return u.pathname === '/'
+    })[0]
+
+    if (key && client){
+      localforage.setItem('welcome', 'true')
+      client.navigate(`/@Ryan@pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/posts/AMZQ43yUFFVkzIKKO0`)
+    }
+
+    await new Promise(r => setTimeout(r, 100))
+  }
 }
 
 main().catch((e) => {
