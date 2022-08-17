@@ -1,6 +1,6 @@
 // /** @type {import('next').NextConfig} */
 const withPWA = require("next-pwa");
-const runtimeCaching = require("./lib/cache.js");
+// const runtimeCaching = require("./lib/cache.js");
 const webpack = require("webpack");
 
 const config = {

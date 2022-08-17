@@ -4,8 +4,8 @@ import {getSupportedPlatform, isSupportedPlatform, isPwa} from '../lib/support'
 import BasicLayout from '../layouts/basic'
 import Trust from '../components/trust'
 
-const WELCOME_STATUS = `https://pleroma.507fd8ace43f877eb8e4f613d0b34e25ab213c356bb1bdd3422970ae2694e47.2.yg/api/v1/statuses/AMZ2VxYnjpo5sK8W00`
-const WELCOME_STATUS_PAGE = `/@ryan@pleroma.507fd8ace43f877eb8e4f613d0b34e25ab213c356bb1bdd3422970ae2694e47.2.yg/posts/AMZ2VxYnjpo5sK8W00`
+const WELCOME_STATUS = 'http://setup.local/timeline/fediverse'//`https://pleroma.507fd8ace43f877eb8e4f613d0b34e25ab213c356bb1bdd3422970ae2694e47.2.yg/api/v1/statuses/AMZ2VxYnjpo5sK8W00`
+const WELCOME_STATUS_PAGE = 'http://setup.local/timeline/fediverse'//`/@ryan@pleroma.507fd8ace43f877eb8e4f613d0b34e25ab213c356bb1bdd3422970ae2694e47.2.yg/posts/AMZ2VxYnjpo5sK8W00`
 
 
 // let timeout = null;
