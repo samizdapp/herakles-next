@@ -149,9 +149,36 @@ self.addEventListener("fetch", function (event) {
 
 // console.log('reasigning fetch')
 // // self.fetch = maybeRedirectFetch
+self.addEventListener('message', async function (evt) {
+  console.log('postMessage received', evt);
+  if (evt.data.type === 'MDNS'){
+    const address = evt.data.address
+    localforage.setItem('mdns', { address })
+  }
+
+  localforage.setItem('started', {started: true})
+  self.client.patchFetchWorker()
+});
+
+self.addEventListener('install', (event) => {
+  // The promise that skipWaiting() returns can be safely ignored.
+  console.log('got install')
+  self.skipWaiting();
+
+  // Perform any other actions required for your
+  // service worker to install, potentially inside
+  // of event.waitUntil();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('got activate')
+  self.clients.claim()
+})
 
 async function main() {
   console.log("starting worker init");
+
+
   const client = new Client(
     { host: self.location.hostname, port: 4000 },
     ({ lan, wan }) => {
@@ -170,7 +197,9 @@ async function main() {
 
   await client.init();
   client.subdomain = "pleroma";
-  client.patchFetchWorker();
+  if (await localforage.getItem('started')){
+    client.patchFetchWorker();
+  }
   self.client = client;
   console.log("patched fetch");
   const soapstore = localforage.createInstance({
@@ -188,7 +217,7 @@ async function main() {
     })[0]
 
     if (key && client){
-      localforage.setItem('welcome', 'true')
+      await localforage.setItem('welcome', 'true')
       client.navigate(`/@Ryan@pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/posts/AMZQ43yUFFVkzIKKO0`)
     }
 

@@ -4,7 +4,7 @@ import {getSupportedPlatform, isSupportedPlatform, isPwa} from '../lib/support'
 import BasicLayout from '../layouts/basic'
 import Trust from '../components/trust'
 
-const WELCOME_STATUS = `https://pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/api/v1/statuses/AMZ2VxYnjpo5sK8W00`
+const WELCOME_STATUS = `http://pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/api/v1/statuses/AMZ2VxYnjpo5sK8W00`
 const WELCOME_STATUS_PAGE = `/@ryan@pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/posts/AMZ2VxYnjpo5sK8W00`
 
 
@@ -25,12 +25,10 @@ async function waitForWelcomeAvailable(){
 }
 
 async function getLoadUrl(){
-  const welcome = await localStorage.getItem('welcome')
+  // const welcome = await localStorage.getItem('welcome')
 
-  if (!welcome) {
-    await waitForWelcomeAvailable()
-    await localStorage.setItem('welcome', 'true')
-  }
+  // await waitForWelcomeAvailable()
+  
 
   return '/'
 }
@@ -81,6 +79,30 @@ export default function Home() {
       setRecommended(getSupportedPlatform())
     }
   }, [reloading]);
+
+  useEffect(() => {
+    (async function(){
+      console.log('wait for controller')
+      while (navigator.serviceWorker?.controller?.state !== "activated"){
+        console.log('wait', navigator.serviceWorker?.controller)
+        await new Promise((r) => setTimeout(r, 1000));
+  }
+      const url = new URL(location.href)
+      console.log('url')
+      const address = url.searchParams.get('mdns')
+      if (address){
+        console.log('postmessage')
+        navigator.serviceWorker.controller.postMessage({
+          type: 'MDNS',
+          address
+        });
+      } else {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'START'
+        })
+      }
+    })()
+  }, [])
 
   if (recommended){
     return <Unsupported recommended={recommended}/>   
