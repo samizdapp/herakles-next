@@ -1,15 +1,16 @@
 // /** @type {import('next').NextConfig} */
 const withPWA = require("next-pwa");
-// const runtimeCaching = require("./lib/cache.js");
+const runtimeCaching = require("next-pwa/cache");
 const webpack = require("webpack");
 
 const config = {
   pwa: {
     dest: "public",
     scope: '/',
-    // runtimeCaching,
-    // cacheStartUrl: false,
-    dynamicStartUrl: true,
+    skipWaiting: true,
+    runtimeCaching,
+    cacheStartUrl: true,
+    dynamicStartUrl: false,
   },
   async headers(){
     return [{
