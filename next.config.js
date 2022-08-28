@@ -11,6 +11,15 @@ const config = {
     // cacheStartUrl: false,
     dynamicStartUrl: true,
   },
+  async headers(){
+    return [{
+      source: "/:path*",
+      headers: [{
+        key: "service-worker-allowed",
+        value: "/"
+      }]
+    }] 
+  },
   basePath: '/pwa',
   trailingSlash: true,
   extends: ["plugin:@next/next/recommended"],
