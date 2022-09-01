@@ -3,10 +3,10 @@ import { CircularIndeterminate } from '../components/progress'
 import {getSupportedPlatform, isSupportedPlatform, isPwa} from '../lib/support'
 import BasicLayout from '../layouts/basic'
 import Trust from '../components/trust'
+import localforage from "localforage";
 
-const WELCOME_STATUS = `http://pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/api/v1/statuses/AMZ2VxYnjpo5sK8W00`
-const WELCOME_STATUS_PAGE = `/@ryan@pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/posts/AMZ2VxYnjpo5sK8W00`
-
+const WELCOME_STATUS = `http://pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/api/v1/statuses/AMZQ43yUFFVkzIKKO0`
+const WELCOME_STATUS_PAGE = `/@ryan@pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/posts/AMZQ43yUFFVkzIKKO0`
 
 // let timeout = null;
 let _reloading = false;
@@ -20,17 +20,20 @@ async function waitForWelcomeAvailable(){
     if (res && res.ok){
       return;
     }
-    await new Promise(r => setTimeout(r, 2000))
+    await new Promise(r => setTimeout(r, 1000))
   } 
 }
 
 async function getLoadUrl(){
-  // const welcome = await localStorage.getItem('welcome')
+  const welcome = await localforage.getItem('welcome')
+  if (welcome) {
+    return '/'
+  }
 
-  // await waitForWelcomeAvailable()
+  await waitForWelcomeAvailable()
   
-
-  return '/'
+  await localforage.setItem('welcome','true')
+  return WELCOME_STATUS_PAGE
 }
 
 async function reload(){
