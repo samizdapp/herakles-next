@@ -5,8 +5,8 @@ import BasicLayout from '../layouts/basic'
 import Trust from '../components/trust'
 import localforage from "localforage";
 
-const WELCOME_STATUS = `http://pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/api/v1/statuses/AMZQ43yUFFVkzIKKO0`
-const WELCOME_STATUS_PAGE = `/@ryan@pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/posts/AMZQ43yUFFVkzIKKO0`
+const WELCOME_STATUS = `http://pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/api/v1/statuses/ANECIUz9GTWPKi7c4e`
+const WELCOME_STATUS_PAGE = '/@Ry@pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/posts/ANECIUz9GTWPKi7c4e'
 
 // let timeout = null;
 let _reloading = false;
@@ -38,14 +38,14 @@ async function getLoadUrl(){
 
 async function reload(){
   // alert('reload fn')
-  if (isPwa() && document.visibilityState === 'visible'){
+  if (document.visibilityState === 'visible'){
     // alert('wait for active worker')
     while (navigator.serviceWorker?.controller?.state !== "activated")
       await new Promise((r) => setTimeout(r, 100));
     // alert('reload')
     if (!_reloading){
       _reloading = true;
-      window.location.href = await getLoadUrl()
+      window.location.href = "/"
     }
   }
 }
@@ -111,9 +111,9 @@ export default function Home() {
     return <Unsupported recommended={recommended}/>   
   }
 
-  if (platform) {
-    return <Instructions platform={platform}/>
-  }
+  // if (platform) {
+  //   return <Instructions platform={platform}/>
+  // }
 
   return (
     <BasicLayout>

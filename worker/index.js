@@ -175,8 +175,8 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-const WELCOME_STATUS = `http://pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/api/v1/statuses/AMZQ43yUFFVkzIKKO0`
-const WELCOME_STATUS_PAGE = `/@ryan@pleroma.3b836fd1ff44e0fca4768822415ef6614d0c0d4f07b96008b1367734161e628.f.yg/posts/AMZQ43yUFFVkzIKKO0`
+const WELCOME_STATUS = `http://pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/api/v1/statuses/ANECIUz9GTWPKi7c4e`
+const WELCOME_STATUS_PAGE = '/@Ry@pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/posts/ANECIUz9GTWPKi7c4e'
 
 async function main() {
   console.log("starting worker init");
@@ -210,23 +210,23 @@ async function main() {
   });
   self.soapstore = soapstore
 
-  while (!(await localforage.getItem('welcome'))){
-    const key = (await soapstore.keys()).filter((k) => {
-      return k.startsWith('authAccount')
-    })[0]
-    const client = (await self.clients.matchAll()).filter(({url}) => {
-      const u = new URL(url)
-      return u.pathname === '/'
-    })[0]
+  // while (!(await localforage.getItem('welcome'))){
+  //   const key = (await soapstore.keys()).filter((k) => {
+  //     return k.startsWith('authAccount')
+  //   })[0]
+  //   const client = (await self.clients.matchAll()).filter(({url}) => {
+  //     const u = new URL(url)
+  //     return u.pathname === '/'
+  //   })[0]
 
-    if (key && client && (await fetch(WELCOME_STATUS).catch(e => ({ok : false}))).ok){
-      await localforage.setItem('welcome', 'true')
+  //   if (key && client){
+  //     await localforage.setItem('welcome', 'true')
 
-      client.navigate(WELCOME_STATUS_PAGE)  
-    }
+  //     client.navigate("/")  
+  //   }
 
-    await new Promise(r => setTimeout(r, 100))
-  }
+  //   await new Promise(r => setTimeout(r, 100))
+  // }
 }
 
 main().catch((e) => {
