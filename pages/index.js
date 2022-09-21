@@ -3,50 +3,11 @@ import { CircularIndeterminate } from '../components/progress'
 import {getSupportedPlatform, isSupportedPlatform, isPwa} from '../lib/support'
 import BasicLayout from '../layouts/basic'
 import Trust from '../components/trust'
-import localforage from "localforage";
 
-const WELCOME_STATUS = `http://pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/api/v1/statuses/ANECIUz9GTWPKi7c4e`
-const WELCOME_STATUS_PAGE = '/@Ry@pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/posts/ANECIUz9GTWPKi7c4e'
-
-// let timeout = null;
-let _reloading = false;
-
-async function waitForWelcomeAvailable(){
-  while (true) {
-    const res = await fetch(WELCOME_STATUS).catch(e => {
-      console.warn(e)
-      return null;
-    })
-    if (res && res.ok){
-      return;
-    }
-    await new Promise(r => setTimeout(r, 1000))
-  } 
-}
-
-async function getLoadUrl(){
-  const welcome = await localforage.getItem('welcome')
-  if (welcome) {
-    return '/'
-  }
-
-  await waitForWelcomeAvailable()
-  
-  await localforage.setItem('welcome','true')
-  return WELCOME_STATUS_PAGE
-}
 
 async function reload(){
-  // alert('reload fn')
   if (document.visibilityState === 'visible'){
-    // alert('wait for active worker')
-    while (navigator.serviceWorker?.controller?.state !== "activated")
-      await new Promise((r) => setTimeout(r, 100));
-    // alert('reload')
-    if (!_reloading){
-      _reloading = true;
-      window.location.href = "/"
-    }
+   await  sendReload()
   }
 }
 
@@ -55,13 +16,41 @@ async function registerReloader(){
   // alert('add visibility listener')
   document.addEventListener('visibilitychange', reload)
   // alert('try reload')
-  return reload()
 }
 
 
 registerReloader().catch(e => {
   alert(e.message)
 })
+
+async function sendReload(setSanity = (m) => { console.log(m) }){
+  setSanity('wait for controller')
+  let i = 0
+  while (navigator.serviceWorker?.controller?.state !== "activated"){
+    setSanity(`waiting for controller ${++i}`)
+    await new Promise((r) => setTimeout(r, 1000));
+}
+  const url = new URL(location.href)
+  const address = url.searchParams.get('mdns')
+  setSanity('send reload message to worker')
+  navigator.serviceWorker.onmessage = (msg) => {
+    if (msg.data === "NAVIGATE"){
+      window.location.href = "/"
+    }
+  }
+
+  if (address){
+    console.log('postmessage')
+    navigator.serviceWorker.controller.postMessage({
+      type: 'MDNS',
+      address
+    });
+  } else {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'START'
+    })
+  }
+}
 
 
 export default function Home() {
@@ -73,10 +62,7 @@ export default function Home() {
 
   useEffect(() => {
     setSanity('insane in the membrane')
-    if (isPwa()){
-      setReloading(true)
-      reload()
-    } else if (isSupportedPlatform()){
+    if (isSupportedPlatform()){
       setPlatform(getSupportedPlatform())
     } else {
       setRecommended(getSupportedPlatform())
@@ -84,27 +70,11 @@ export default function Home() {
   }, [reloading]);
 
   useEffect(() => {
-    (async function(){
-      console.log('wait for controller')
-      while (navigator.serviceWorker?.controller?.state !== "activated"){
-        console.log('wait', navigator.serviceWorker?.controller)
-        await new Promise((r) => setTimeout(r, 1000));
-  }
-      const url = new URL(location.href)
-      console.log('url')
-      const address = url.searchParams.get('mdns')
-      if (address){
-        console.log('postmessage')
-        navigator.serviceWorker.controller.postMessage({
-          type: 'MDNS',
-          address
-        });
-      } else {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'START'
-        })
-      }
-    })()
+    if (isPwa()){
+      sendReload(setSanity)
+    } else {
+      setSanity('please install PWA to continue')
+    }
   }, [])
 
   if (recommended){

@@ -158,6 +158,7 @@ self.addEventListener('message', async function (evt) {
 
   localforage.setItem('started', {started: true})
   self.client.patchFetchWorker()
+  await navToRoot()
 });
 
 self.addEventListener('install', (event) => {
@@ -175,12 +176,20 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-const WELCOME_STATUS = `http://pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/api/v1/statuses/ANECIUz9GTWPKi7c4e`
-const WELCOME_STATUS_PAGE = '/@Ry@pleroma.4a4587d4f25abf54677b07d6f46c269ed8a7b50052e67b20a0f70c9f2328543.1.yg/posts/ANECIUz9GTWPKi7c4e'
+async function navToRoot(){
+  const clienttab = (await self.clients.matchAll()).filter(({url}) => {
+    const u = new URL(url)
+    return  u.pathname === "/pwa"
+  })[0]
 
+  if (clienttab){
+    clienttab.navigate('/').catch(e => {
+      clienttab.postMessage('NAVIGATE')
+    })
+  }
+}
 async function main() {
   console.log("starting worker init");
-
 
   const client = new Client(
     { host: self.location.hostname, port: 4000 },
@@ -202,22 +211,16 @@ async function main() {
   client.subdomain = "pleroma";
   if (await localforage.getItem('started')){
     client.patchFetchWorker();
+    await navToRoot()
   }
   self.client = client;
-  console.log("patched fetch");
-  const soapstore = localforage.createInstance({
-    name: "soapbox"
-  });
-  self.soapstore = soapstore
+
 
   // while (!(await localforage.getItem('welcome'))){
   //   const key = (await soapstore.keys()).filter((k) => {
   //     return k.startsWith('authAccount')
   //   })[0]
-  //   const client = (await self.clients.matchAll()).filter(({url}) => {
-  //     const u = new URL(url)
-  //     return u.pathname === '/'
-  //   })[0]
+
 
   //   if (key && client){
   //     await localforage.setItem('welcome', 'true')
