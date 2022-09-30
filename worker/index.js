@@ -1,163 +1,316 @@
-import Client from "herakles-lib/dist/pocket_client";
-// import Client from 'https'
-import localforage from "localforage";
+import { createLibp2p } from 'libp2p'
+import { WebSockets } from '@libp2p/websockets'
+import { Noise } from '@chainsafe/libp2p-noise'
+import { Mplex } from '@libp2p/mplex'
+import { all as filter } from '@libp2p/websockets/filters'
+import localforage from 'localforage'
+import { LevelDatastore } from 'datastore-level'
+import { dnsaddrResolver } from '@multiformats/multiaddr/resolvers'
+import { Bootstrap } from '@libp2p/bootstrap'
+import { encode, decode } from "lob-enc";
+import { Buffer } from 'buffer/'
+import { pipe } from 'it-pipe'
+
+const CHUNK_SIZE = 1024 * 8;
+self.Buffer = Buffer;
+
+self._fetch = fetch;
+
+async function normalizeBody(body) {
+  try {
+    if (!body) return undefined;
+    if (typeof body === "string") return Buffer.from(body);
+    if (Buffer.isBuffer(body)) return body;
+    if (body instanceof ArrayBuffer) {
+      if (body.byteLength > 0) return Buffer.from(new Uint8Array(body));
+      return undefined;
+    }
+    if (body.arrayBuffer) {
+      return Buffer.from(new Uint8Array(await body.arrayBuffer()));
+    }
+    if (body.toString() === "[object ReadableStream]") {
+      const reader = body.getReader();
+      const chunks = [];
+      let _done = false;
+      do {
+        const { done, value } = await reader.read();
+        _done = done;
+        chunks.push(Buffer.from(new Uint8Array(value)));
+      } while (!_done);
+      return Buffer.concat(chunks);
+    }
+
+    throw new Error(`don't know how to handle body`);
+  } catch (e) {
+    return Buffer.from(
+      `${e.message} ${typeof body} ${body.toString()} ${JSON.stringify(body)}`
+    );
+  }
+}
+
+async function getStream() {
+  let streamOrNull = null;
+  do {
+    streamOrNull = await Promise.race([
+      self.node.dialProtocol(self.serverPeer, '/samizdapp-proxy'),
+      new Promise(r => setTimeout(r, 2000))
+    ])
+    if (!streamOrNull) {
+      await self.node.stop()
+      await self.node.start()
+    }
+  } while (!streamOrNull)
+
+  return streamOrNull
+}
+
+async function p2Fetch(reqObj, reqInit = {}) {
+  // console.log('p2Fetch')
+  const patched = patchFetchArgs(reqObj, reqInit);
+  const body = reqObj.body ? reqObj.body
+    : reqInit.body ? reqInit.body
+      : reqObj.arrayBuffer ? (await reqObj.arrayBuffer())
+        : null;
+
+  reqObj = patched.reqObj;
+  reqInit = patched.reqInit;
+  // console.log("pocketFetch2", reqObj, reqInit, body);
+  delete reqObj.body;
+  delete reqInit.body;
+  const pbody = await normalizeBody(body);
+  const packet = encode({ reqObj, reqInit }, pbody);
+  // console.log('packet:', packet.toString('hex'))
+
+  // console.log('packet?', packet)
+  const stream = await getStream()
+
+  let i = 0;
+  const parts = []
+  for (; i <= Math.floor(packet.length / CHUNK_SIZE); i++) {
+    parts.push(
+      packet.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
+    );
+  }
+
+  parts.push(Buffer.from([0x00]))
+  // console.log('parts:')
+  // parts.forEach(p => console.log(p.toString('hex')))
+
+  return new Promise((resolve, reject) => {
+    let done = false
+    try {
+      pipe(
+        parts,
+        stream,
+        async function (source) {
+          const parts = []
+          for await (const msg of source) {
+            const buf = Buffer.from(msg.subarray())
+            if (msg.subarray().length === 1 && buf[0] === 0x00) {
+              const resp = decode(Buffer.concat(parts));
+              if (!resp.json.res) {
+                return reject(resp.json.error)
+              }
+              resp.json.res.headers = new Headers(resp.json.res.headers);
+              // alert("complete");
+              done = true;
+              resolve(new Response(resp.body, resp.json.res));
+              stream.close()
+            } else {
+              parts.push(buf)
+            }
+          }
+        }
+      )
+    } catch (e) {
+      console.warn(e)
+      if (!done) {
+        p2Fetch(reqObj, reqInit).then(resolve).catch(reject)
+      }
+    }
+
+  })
+}
+
+const getHost = () => {
+  try {
+    return window.location.host
+  } catch (e) {
+    return self.location.host
+  }
+}
+
+function patchFetchArgs(_reqObj, _reqInit = {}) {
+  // if (typeof _reqObj === "string" && _reqObj.startsWith("http")) {
+  // console.log("patch");
+  const url = new URL(_reqObj.url.startsWith('http') ? _reqObj.url : `http://localhost${_reqObj.url}`);
+  _reqInit.headers = _reqObj.headers || {};
+  if (url.pathname !== '/manifest.json') {
+    _reqInit.headers["X-Intercepted-Subdomain"] = 'pleroma';
+  }
+
+  for (var pair of _reqObj.headers.entries()) {
+    _reqInit.headers[pair[0]] = pair[1];
+    // console.log(pair[0] + ": " + pair[1]);
+  }
+
+  if (url.host === getHost()) {
+    // console.log("subdomain", _reqInit);
+    url.host = "localhost";
+    url.protocol = "http:";
+    url.port = "80";
+  }
+
+  // }
+
+  const reqObj = {
+    bodyUsed: _reqObj.bodyUsed,
+    cache: _reqObj.cache,
+    credentials: _reqObj.credentials,
+    destination: _reqObj.destination,
+    headers: _reqObj.headers,
+    integrity: _reqObj.integrity,
+    isHistoryNavigation: _reqObj.isHistoryNavigation,
+    keepalive: _reqObj.keepalive,
+    method: _reqObj.method,
+    mode: _reqObj.mode,
+    redirect: _reqObj.redirect,
+    referrer: _reqObj.referrer,
+    referrerPolicy: _reqObj.referrerPolicy,
+    url: url.toString(),
+  };
+
+  const reqInit = _reqInit;
+
+  return { reqObj, reqInit };
+}
+async function main() {
+  const bootstrapaddr = await localforage.getItem('libp2p.bootstrap') || await fetch('/pwa/libp2p.bootstrap').then(r => r.text()).then(async id => {
+    await localforage.setItem('libp2p.bootstrap', id)
+    return id
+  })
+
+  const { hostname } = new URL(self.origin)
+  const [_, _proto, _ip, ...rest] = bootstrapaddr.split('/')
+  const hostaddr = `/dns4/${hostname}/${rest.join('/')}`
+  const bootstraplist = [bootstrapaddr, hostaddr]
+  const datastore = new LevelDatastore('./libp2p')
+  await datastore.open() // level database must be ready before node boot
+  const serverID = bootstrapaddr.split('/').pop()
+
+  const node = await createLibp2p({
+    datastore,
+    transports: [
+      new WebSockets({
+        filter
+      })
+    ],
+    connectionEncryption: [
+      new Noise()
+    ],
+    streamMuxers: [
+      new Mplex()
+    ],
+    peerDiscovery: [
+      new Bootstrap({
+        list: bootstraplist // provide array of multiaddrs
+      })
+    ],
+    connectionManager: {
+      autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
+      minConnections: 0,
+      maxDialsPerPeer: 10
+      // The `tag` property will be searched when creating the instance of your Peer Discovery service.
+      // The associated object, will be passed to the service when it is instantiated.
+    },
+    relay: {                   // Circuit Relay options (this config is part of libp2p core configurations)
+      enabled: true,           // Allows you to dial and accept relayed connections. Does not make you a relay.
+      autoRelay: {
+        enabled: true,         // Allows you to bind to relays with HOP enabled for improving node dialability
+        maxListeners: 2         // Configure maximum number of HOP relays to use
+      }
+    },
+    dialer: {
+      dialTimeout: 60000
+    },
+    resolvers: {
+      dnsaddr: dnsaddrResolver
+      // ,
+      // host: hostResolver
+    },
+    peerStore: {
+      persistence: true,
+      threshold: 5
+    },
+  })
+  // Listen for new peers
+  let foundServer = false;
+  node.addEventListener('peer:discovery', (evt) => {
+    const peer = evt.detail
+    console.log(`Found peer ${peer.id.toString()}`)
+    // peer.multiaddrs.forEach(ma => console.log(ma.toString()))
+    // console.log(peer)
+    if (peer.id.toString() === serverID && !foundServer) {
+      foundServer = true;
+      node.ping(peer.id)
+    }
+  })
+
+  // Listen for new connections to peers
+  let serverConnected = false;
+  node.connectionManager.addEventListener('peer:connect', async (evt) => {
+    const connection = evt.detail
+    const str_id = connection.remotePeer.toString()
+
+    console.log(`Connected to ${connection.remotePeer.toString()}`)
+    if (str_id === serverID && !serverConnected) {
+      serverConnected = true;
+      self.serverPeer = connection.remotePeer
+      self.fetch = p2Fetch.bind(self)
+    }
+    // while (true) {
+    //   await new Promise(r => setTimeout(r, 5000))
+    //   await node.ping(connection.remotePeer).catch(async e => {
+    //     await node.stop()
+    //     await node.start()
+    //   })
+    // }
+
+  })
+
+  // Listen for peers disconnecting
+  node.connectionManager.addEventListener('peer:disconnect', (evt) => {
+    const connection = evt.detail
+    console.log(`Disconnected from ${connection.remotePeer.toString()}`)
+  })
+
+  await node.start()
+  self.libp2p = self.node = node;
+}
+
+main()
 
 self.setImmediate = (fn) => setTimeout(fn, 0);
 
-// To disable all workbox logging during development, you can set self.__WB_DISABLE_DEV_LOGS to true
-// https://developers.google.com/web/tools/workbox/guides/configure-workbox#disable_logging
-//
-// self.__WB_DISABLE_DEV_LOGS = true
 
-// const _fetch = self.fetch
-
-// Listen to fetch events
 self.addEventListener("fetch", function (event) {
-  console.log("event", event);
   if (event?.request.method !== "GET") {
     // default service worker only handles GET
     event?.respondWith(fetch(event.request));
   }
-  //   if (/\.jpg$|.png$/.test(event.request.url)) {                             1
-
-  //     var supportsWebp = false;
-  //     if (event.request.headers.has('accept')) {                              2
-  //       supportsWebp = event.request.headers
-  //         .get('accept')
-  //         .includes('webp');
-  //     }
-
-  //     if (supportsWebp) {                                                     3
-  //        var req = event.request.clone();
-
-  //       var returnUrl = req.url.substr(0, req.url.lastIndexOf(".")) + ".webp";4
-
-  //       event.respondWith(
-  //         fetch(returnUrl, {
-  //           mode: 'no-cors'
-  //         })
-  //       );
-  //     }
-  //   }
 });
 
-// const broadcast = new BroadcastChannel('address-channel');
+self.addEventListener('online', () => console.log('<<<<online'))
+self.addEventListener('offline', () => console.log('<<<<offline'))
 
-// async function getAddress(request: any): Promise<string> {
-//     const { hostname } = new URL(request.url)
-//     const bootstrap = hostname.endsWith('localhost') ? ['192.168.42.1', '127.0.0.1'] : [hostname]
-//     let addresses: Array<string> = (await localforage.getItem('addresses')) || bootstrap
-
-//     // do {
-//     broadcast.postMessage({
-//         type: 'TRY_ADDRESSES',
-//         nonce: Date.now(),
-//         addresses
-//     })
-//     const returned: AddressesResponse = await Promise.race(addresses.map((addr, i) => {
-
-//         return _fetch(`http://${addr}/api/addresses`, { referrerPolicy: "unsafe-url" }).then(r => {
-//             broadcast.postMessage({
-//                 type: 'TRIED_ADDRESS',
-//                 nonce: Date.now(),
-//                 addr
-//             });
-//             if (!r.ok) throw new Error()
-//             return r.json()
-//         }).then(json => {
-//             return ({
-//                 ...json,
-//                 index: i
-//             })
-//         }).catch((e) => {
-//             broadcast.postMessage({
-//                 type: 'TRIED_ADDRESS_ERROR',
-//                 nonce: Date.now(),
-//                 addr,
-//                 error: e.toString()
-//             });
-//             return new Promise(r => setTimeout(r, 1000))
-//         })
-//     }))
-//     if (!returned) {
-//         return getAddress(request)
-//     }
-//     const preferred = addresses[returned?.index || 0]
-//     broadcast.postMessage({
-//         type: 'PREFERRED_ADDRESS',
-//         nonce: Date.now(),
-//         addresses,
-//         preferred
-//     });
-//     // console.log('got addresses, good index:', returned.index)
-//     addresses = returned?.addresses ? bootstrap.concat(returned.addresses).map(s => s.trim()) : addresses
-//     await localforage.setItem('addresses', addresses)
-//     return preferred === 'localhost' ? '127.0.0.1' : preferred
-//     // } while (true)
-// }
-
-// function shouldHandle(request: any) {
-//     console.log('shouldHandle?', request)
-//     const { hostname } = new URL(request.url)
-
-//     return hostname.endsWith(self.location.hostname) && request.url !== `http://${self.location.hostname}/`
-// }
-
-// async function maybeRedirectFetch(request: any, options: object) {
-//     console.log('check shouldHandle')
-//     if (!shouldHandle(request)) {
-//         return _fetch(request, options)
-//     }
-//     const address = await getAddress(request)
-//     const { hostname, pathname, searchParams } = new URL(request.url)
-//     const _headers = request.headers
-//     const mode = request.mode
-//     const method = request.method
-//     const keepalive = request.keepalive
-//     const redirect = request.redirect
-//     const referrer = request.referrer
-//     const referrerPolicy = request.referrerPolicy
-//     const body = ['GET', 'HEAD'].includes(method) ? undefined : await request.blob()
-
-//     const headerMap = new Map()
-//     const [subdomain] = hostname.split('.')
-
-//     headerMap.set("X-Intercepted-Subdomain", subdomain)
-
-//     for (const [key, value] of _headers) {
-//         headerMap.set(key, value)
-//     }
-
-//     const headers = Object.fromEntries(headerMap)
-
-//     const args = {
-//         headers,
-//         mode: mode === 'navigate' ? undefined : mode,
-//         method,
-//         keepalive,
-//         redirect,
-//         referrer,
-//         referrerPolicy,
-//         body,
-//         ...options
-//     }
-
-//     const url = `http://${address}${pathname}${searchParams ? `?${searchParams}` : ''}`
-
-//     return _fetch(url, args)
-// }
-
-// console.log('reasigning fetch')
-// // self.fetch = maybeRedirectFetch
 self.addEventListener('message', async function (evt) {
   console.log('postMessage received', evt);
-  if (evt.data.type === 'MDNS'){
+  if (evt.data.type === 'MDNS') {
     const address = evt.data.address
     localforage.setItem('mdns', { address })
   }
 
-  localforage.setItem('started', {started: true})
-  self.client.patchFetchWorker()
+  localforage.setItem('started', { started: true })
   await navToRoot()
 });
 
@@ -176,62 +329,15 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-async function navToRoot(){
-  const clienttab = (await self.clients.matchAll()).filter(({url}) => {
+async function navToRoot() {
+  const clienttab = (await self.clients.matchAll()).filter(({ url }) => {
     const u = new URL(url)
-    return  u.pathname === "/pwa"
+    return u.pathname === "/pwa"
   })[0]
 
-  if (clienttab){
+  if (clienttab) {
     clienttab.navigate('/').catch(e => {
       clienttab.postMessage('NAVIGATE')
     })
   }
 }
-async function main() {
-  console.log("starting worker init");
-
-  const client = new Client(
-    { host: self.location.hostname, port: 4000 },
-    ({ lan, wan }) => {
-      console.log("worker got", lan, wan);
-      localforage.setItem("addresses", { lan, wan });
-    }
-  );
-
-  const obj = await localforage.getItem("addresses");
-  if (obj) {
-    obj.lan = obj.lan.trim();
-    obj.wan = obj.wan.trim();
-    console.log("got stored addresses", obj);
-    client.handleAddresses(obj);
-  }
-
-  await client.init();
-  client.subdomain = "pleroma";
-  if (await localforage.getItem('started')){
-    client.patchFetchWorker();
-    await navToRoot()
-  }
-  self.client = client;
-
-
-  // while (!(await localforage.getItem('welcome'))){
-  //   const key = (await soapstore.keys()).filter((k) => {
-  //     return k.startsWith('authAccount')
-  //   })[0]
-
-
-  //   if (key && client){
-  //     await localforage.setItem('welcome', 'true')
-
-  //     client.navigate("/")  
-  //   }
-
-  //   await new Promise(r => setTimeout(r, 100))
-  // }
-}
-
-main().catch((e) => {
-  console.log("custom error", e);
-});
