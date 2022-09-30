@@ -4,7 +4,7 @@ public/sw.js.map
 public/sw.js
 public/worker-*
 public/workbox-*
-publib/libp2p*
+public/libp2p*
 .next
 tmp
 out
