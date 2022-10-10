@@ -10,6 +10,11 @@ import { Bootstrap } from '@libp2p/bootstrap'
 import { encode, decode } from "lob-enc";
 import { Buffer } from 'buffer/'
 import { pipe } from 'it-pipe'
+import Multiaddr from 'multiaddr'
+
+self.DIAL_TIMEOUT = 20000
+
+self.Multiaddr = Multiaddr
 
 const CHUNK_SIZE = 1024 * 8;
 self.Buffer = Buffer;
@@ -48,24 +53,34 @@ async function normalizeBody(body) {
   }
 }
 
-async function getStream() {
+async function getStream(protocol = '/samizdapp-proxy') {
   let streamOrNull = null;
   do {
     streamOrNull = await Promise.race([
-      self.node.dialProtocol(self.serverPeer, '/samizdapp-proxy'),
-      new Promise(r => setTimeout(r, 2000))
+      self.node.dialProtocol(self.serverPeer, protocol).catch(e => {
+        console.log('dialProtocol error, retry', e)
+        return null;
+      }),
+      new Promise(r => setTimeout(r, self.DIAL_TIMEOUT))
     ])
     if (!streamOrNull) {
       await self.node.stop()
       await self.node.start()
+      const relays = await localforage.getItem('libp2p.relays').then(str_array => {
+        return str_array.map(Multiaddr.multiaddr)
+      })
+      await self.node.peerStore.addressBook.add(self.serverPeer, relays)
+
     }
   } while (!streamOrNull)
 
   return streamOrNull
 }
 
+self.getStream = getStream;
+
 async function p2Fetch(reqObj, reqInit = {}) {
-  // console.log('p2Fetch')
+  // console.log('p2Fetch', reqObj)
   const patched = patchFetchArgs(reqObj, reqInit);
   const body = reqObj.body ? reqObj.body
     : reqInit.body ? reqInit.body
@@ -184,111 +199,163 @@ function patchFetchArgs(_reqObj, _reqInit = {}) {
 
   return { reqObj, reqInit };
 }
-async function main() {
-  const bootstrapaddr = await localforage.getItem('libp2p.bootstrap') || await fetch('/pwa/libp2p.bootstrap').then(r => r.text()).then(async id => {
-    await localforage.setItem('libp2p.bootstrap', id)
-    return id
-  })
 
-  const { hostname } = new URL(self.origin)
-  const [_, _proto, _ip, ...rest] = bootstrapaddr.split('/')
-  const hostaddr = `/dns4/${hostname}/${rest.join('/')}`
-  const bootstraplist = [bootstrapaddr, hostaddr]
-  const datastore = new LevelDatastore('./libp2p')
-  await datastore.open() // level database must be ready before node boot
-  const serverID = bootstrapaddr.split('/').pop()
-
-  const node = await createLibp2p({
-    datastore,
-    transports: [
-      new WebSockets({
-        filter
-      })
-    ],
-    connectionEncryption: [
-      new Noise()
-    ],
-    streamMuxers: [
-      new Mplex()
-    ],
-    peerDiscovery: [
-      new Bootstrap({
-        list: bootstraplist // provide array of multiaddrs
-      })
-    ],
-    connectionManager: {
-      autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
-      minConnections: 0,
-      maxDialsPerPeer: 10
-      // The `tag` property will be searched when creating the instance of your Peer Discovery service.
-      // The associated object, will be passed to the service when it is instantiated.
-    },
-    relay: {                   // Circuit Relay options (this config is part of libp2p core configurations)
-      enabled: true,           // Allows you to dial and accept relayed connections. Does not make you a relay.
-      autoRelay: {
-        enabled: true,         // Allows you to bind to relays with HOP enabled for improving node dialability
-        maxListeners: 2         // Configure maximum number of HOP relays to use
+async function openRelayStream() {
+  while (true) {
+    const stream = await getStream('/samizdapp-relay').catch(e => {
+      console.error('error getting stream', e)
+    })
+    if (!stream) {
+      return;
+    }
+    console.log('got relay stream')
+    await pipe(
+      stream.source,
+      async function (source) {
+        for await (const msg of source) {
+          const str_relay = Buffer.from(msg.subarray()).toString()
+          const multiaddr = Multiaddr.multiaddr(str_relay)
+          console.log('got relay multiaddr', multiaddr.toString())
+          await localforage.getItem('libp2p.relays').then((str_array) => {
+            return localforage.setItem('libp2p.relays', [str_relay, ...(str_array || [])])
+          })
+          await self.node.peerStore.addressBook.add(self.serverPeer, [multiaddr]).catch(e => {
+            console.warn('error adding multiaddr', multiaddr.toString())
+            console.error(e)
+          })
+        }
       }
-    },
-    dialer: {
-      dialTimeout: 60000
-    },
-    resolvers: {
-      dnsaddr: dnsaddrResolver
-      // ,
-      // host: hostResolver
-    },
-    peerStore: {
-      persistence: true,
-      threshold: 5
-    },
-  })
-  // Listen for new peers
-  let foundServer = false;
-  node.addEventListener('peer:discovery', (evt) => {
-    const peer = evt.detail
-    console.log(`Found peer ${peer.id.toString()}`)
-    // peer.multiaddrs.forEach(ma => console.log(ma.toString()))
-    // console.log(peer)
-    if (peer.id.toString() === serverID && !foundServer) {
-      foundServer = true;
-      node.ping(peer.id)
-    }
-  })
-
-  // Listen for new connections to peers
-  let serverConnected = false;
-  node.connectionManager.addEventListener('peer:connect', async (evt) => {
-    const connection = evt.detail
-    const str_id = connection.remotePeer.toString()
-
-    console.log(`Connected to ${connection.remotePeer.toString()}`)
-    if (str_id === serverID && !serverConnected) {
-      serverConnected = true;
-      self.serverPeer = connection.remotePeer
-      self.fetch = p2Fetch.bind(self)
-    }
-    // while (true) {
-    //   await new Promise(r => setTimeout(r, 5000))
-    //   await node.ping(connection.remotePeer).catch(async e => {
-    //     await node.stop()
-    //     await node.start()
-    //   })
-    // }
-
-  })
-
-  // Listen for peers disconnecting
-  node.connectionManager.addEventListener('peer:disconnect', (evt) => {
-    const connection = evt.detail
-    console.log(`Disconnected from ${connection.remotePeer.toString()}`)
-  })
-
-  await node.start()
-  self.libp2p = self.node = node;
+    ).catch(e => {
+      console.log('error in pipe', e)
+    })
+  }
 }
 
-main()
+async function main() {
+  return new Promise(async (RESOLVE, REJECT) => {
+    try {
+
+      const bootstrapaddr = await localforage.getItem('libp2p.bootstrap') || await fetch('/pwa/libp2p.bootstrap').then(r => r.text()).then(async id => {
+        await localforage.setItem('libp2p.bootstrap', id)
+        return id
+      })
+
+      const relay_addrs = (await localforage.getItem('libp2p.relays').catch(_ => ([]))) || []
+
+      const { hostname } = new URL(self.origin)
+      const [_, _proto, _ip, ...rest] = bootstrapaddr.split('/')
+      const hostaddr = `/dns4/${hostname}/${rest.join('/')}`
+      const bootstraplist = [bootstrapaddr, hostaddr, ...relay_addrs]
+      const datastore = new LevelDatastore('./libp2p')
+      await datastore.open() // level database must be ready before node boot
+      const serverID = bootstrapaddr.split('/').pop()
+
+      const node = await createLibp2p({
+        datastore,
+        transports: [
+          new WebSockets({
+            filter
+          })
+        ],
+        connectionEncryption: [
+          new Noise()
+        ],
+        streamMuxers: [
+          new Mplex()
+        ],
+        peerDiscovery: [
+          new Bootstrap({
+            list: bootstraplist // provide array of multiaddrs
+          })
+        ],
+        connectionManager: {
+          autoDial: true, // Auto connect to discovered peers (limited by ConnectionManager minConnections)
+          minConnections: 0,
+          maxDialsPerPeer: 10
+          // The `tag` property will be searched when creating the instance of your Peer Discovery service.
+          // The associated object, will be passed to the service when it is instantiated.
+        },
+        relay: {                   // Circuit Relay options (this config is part of libp2p core configurations)
+          enabled: true,           // Allows you to dial and accept relayed connections. Does not make you a relay.
+          autoRelay: {
+            enabled: true,         // Allows you to bind to relays with HOP enabled for improving node dialability
+            maxListeners: 5         // Configure maximum number of HOP relays to use
+          }
+        },
+        dialer: {
+          dialTimeout: self.DIAL_TIMEOUT,
+          maxParallels: 25,
+          maxAddrsToDial: 25,
+          maxDialsPerPeer: 10
+        },
+        resolvers: {
+          dnsaddr: dnsaddrResolver
+          // ,
+          // host: hostResolver
+        },
+        peerStore: {
+          persistence: true,
+          threshold: 1
+        },
+      })
+      // Listen for new peers
+      let foundServer = false;
+      node.addEventListener('peer:discovery', (evt) => {
+        const peer = evt.detail
+        console.log(`Found peer ${peer.id.toString()}`)
+        // peer.multiaddrs.forEach(ma => console.log(ma.toString()))
+        // console.log(peer)
+        if (peer.id.toString() === serverID && !foundServer) {
+          foundServer = true;
+          node.ping(peer.id)
+        }
+      })
+
+      node.peerStore.addEventListener('change:multiaddrs', (evt) => {
+        // Updated self multiaddrs?
+        // if (evt.detail.peerId.equals(node.peerId)) {
+        console.log(`updated addresses for ${evt.detail.peerId.toString()}`)
+        console.log(evt.detail)
+        // }
+      })
+
+      // Listen for new connections to peers
+      let serverConnected = false;
+      node.connectionManager.addEventListener('peer:connect', async (evt) => {
+        const connection = evt.detail
+        const str_id = connection.remotePeer.toString()
+
+        console.log(`Connected to ${str_id}, check ${serverID}, serverConnected ${serverConnected}`)
+        if (str_id === serverID && !serverConnected) {
+          serverConnected = true;
+          self.serverPeer = connection.remotePeer
+          openRelayStream(node)
+          RESOLVE()
+        }
+        // while (true) {
+        //   await new Promise(r => setTimeout(r, 5000))
+        //   await node.ping(connection.remotePeer).catch(async e => {
+        //     await node.stop()
+        //     await node.start()
+        //   })
+        // }
+
+      })
+
+      // Listen for peers disconnecting
+      node.connectionManager.addEventListener('peer:disconnect', (evt) => {
+        const connection = evt.detail
+        console.log(`Disconnected from ${connection.remotePeer.toString()}`)
+      })
+
+      await node.start()
+      self.libp2p = self.node = node;
+    } catch (e) {
+      REJECT(e)
+    }
+  })
+}
+
 
 self.setImmediate = (fn) => setTimeout(fn, 0);
 
@@ -324,9 +391,9 @@ self.addEventListener('install', (event) => {
   // of event.waitUntil();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', async (event) => {
   console.log('got activate')
-  self.clients.claim()
+  await self.clients.claim()
 })
 
 async function navToRoot() {
@@ -341,3 +408,21 @@ async function navToRoot() {
     })
   }
 }
+
+self.deferral = main().then(() => {
+  console.log('patching fetch')
+  self.fetch = p2Fetch.bind(self)
+})
+
+self.stashedFetch = self.fetch
+
+self.fetch = async (...args) => {
+  if (typeof args[0] === 'string') {
+    return self.stashedFetch(...args)
+  }
+  console.log('fetch waiting for deferral', args[0])
+  await self.deferral
+  console.log('fetch deferred', args[0])
+  return self.fetch(...args)
+}
+

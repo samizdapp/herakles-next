@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { CircularIndeterminate } from '../components/progress'
-import {getSupportedPlatform, isSupportedPlatform, isPwa} from '../lib/support'
+import { getSupportedPlatform, isSupportedPlatform, isPwa } from '../lib/support'
 import BasicLayout from '../layouts/basic'
 import Trust from '../components/trust'
 
 
-async function reload(){
-  if (document.visibilityState === 'visible'){
-   await  sendReload()
+async function reload() {
+  if (document.visibilityState === 'visible') {
+    await sendReload()
   }
 }
 
-async function registerReloader(){
+async function registerReloader() {
   if (typeof window === 'undefined') return;
   // alert('add visibility listener')
   document.addEventListener('visibilitychange', reload)
@@ -23,23 +23,25 @@ registerReloader().catch(e => {
   alert(e.message)
 })
 
-async function sendReload(setSanity = (m) => { console.log(m) }){
+async function sendReload(setSanity = (m) => { console.log(m) }) {
   setSanity('wait for controller')
   let i = 0
-  while (navigator.serviceWorker?.controller?.state !== "activated"){
-    setSanity(`waiting for controller ${++i}`)
+  let swstate = navigator.serviceWorker?.controller?.state
+  while (swstate != "activated") {
+    setSanity(`waiting for controller ${++i} ${navigator.serviceWorker?.controller?.state}`)
+    swstate = navigator.serviceWorker?.controller?.state;
     await new Promise((r) => setTimeout(r, 1000));
-}
+  }
   const url = new URL(location.href)
   const address = url.searchParams.get('mdns')
   setSanity('send reload message to worker')
   navigator.serviceWorker.onmessage = (msg) => {
-    if (msg.data === "NAVIGATE"){
+    if (msg.data === "NAVIGATE") {
       window.location.href = "/"
     }
   }
 
-  if (address){
+  if (address) {
     console.log('postmessage')
     navigator.serviceWorker.controller.postMessage({
       type: 'MDNS',
@@ -62,7 +64,7 @@ export default function Home() {
 
   useEffect(() => {
     setSanity('insane in the membrane')
-    if (isSupportedPlatform()){
+    if (isSupportedPlatform()) {
       setPlatform(getSupportedPlatform())
     } else {
       setRecommended(getSupportedPlatform())
@@ -70,15 +72,15 @@ export default function Home() {
   }, [reloading]);
 
   useEffect(() => {
-    if (isPwa()){
+    if (isPwa()) {
       sendReload(setSanity)
     } else {
       setSanity('please install PWA to continue')
     }
   }, [])
 
-  if (recommended){
-    return <Unsupported recommended={recommended}/>   
+  if (recommended) {
+    return <Unsupported recommended={recommended} />
   }
 
   // if (platform) {
@@ -88,12 +90,12 @@ export default function Home() {
   return (
     <BasicLayout>
       {`${sanity} reloading ${reloading}: ${error ? error.message : 'no error'}`}
-      <CircularIndeterminate/>
+      <CircularIndeterminate />
     </BasicLayout>
   );
 }
 
-function Unsupported({recommended}){
+function Unsupported({ recommended }) {
   return (
     <BasicLayout>
       <h1>Please open this page in {recommended}</h1>
@@ -101,18 +103,18 @@ function Unsupported({recommended}){
   )
 }
 
-function Instructions({platform}){
-  if (platform === 'Chrome'){
+function Instructions({ platform }) {
+  if (platform === 'Chrome') {
     return (
-      <BasicLayout><Trust/></BasicLayout>
+      <BasicLayout><Trust /></BasicLayout>
     )
-  } else if (platform === 'Safari'){
+  } else if (platform === 'Safari') {
     return (
-      <SafariInstall/>
+      <SafariInstall />
     )
   }
 }
 
-function SafariInstall(){
+function SafariInstall() {
   <BasicLayout>add to home screen</BasicLayout>
 }

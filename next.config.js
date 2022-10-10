@@ -8,19 +8,22 @@ const config = {
     dest: "public",
     scope: '/',
     skipWaiting: true,
-    runtimeCaching,
-    cacheStartUrl: true,
-    dynamicStartUrl: false,
+    // runtimeCaching,
+    // cacheStartUrl: true,
+    // dynamicStartUrl: false,
+    // runtimeCaching,
+    // cacheStartUrl: false,
+    dynamicStartUrl: true,
   },
-  async headers(){
-    return [{
-      source: "/:path*",
-      headers: [{
-        key: "service-worker-allowed",
-        value: "/"
-      }]
-    }] 
-  },
+  // async headers(){
+  //   return [{
+  //     source: "/:path*",
+  //     headers: [{
+  //       key: "service-worker-allowed",
+  //       value: "/"
+  //     }]
+  //   }] 
+  // },
   basePath: '/pwa',
   trailingSlash: true,
   extends: ["plugin:@next/next/recommended"],
